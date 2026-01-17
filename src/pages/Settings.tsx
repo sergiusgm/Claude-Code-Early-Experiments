@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
-import { Save } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Save, Download, Upload, Trash2 } from 'lucide-react';
 import type { BusinessProfile } from '../types';
 import { getBusinessProfile, saveBusinessProfile } from '../utils/storage';
+import { downloadBackup, importData, clearAllData } from '../utils/dataBackup';
 
 export default function Settings() {
   const [profile, setProfile] = useState<BusinessProfile>({
@@ -14,6 +15,8 @@ export default function Settings() {
     taxId: '',
   });
   const [isSaved, setIsSaved] = useState(false);
+  const [importMessage, setImportMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const savedProfile = getBusinessProfile();
@@ -35,6 +38,34 @@ export default function Settings() {
         setProfile({ ...profile, logo: reader.result as string });
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleBackupDownload = () => {
+    downloadBackup();
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        const importResult = importData(result);
+
+        if (importResult.success) {
+          setImportMessage({ type: 'success', text: 'Data imported successfully! Refreshing page...' });
+          setTimeout(() => window.location.reload(), 2000);
+        } else {
+          setImportMessage({ type: 'error', text: importResult.error || 'Import failed' });
+          setTimeout(() => setImportMessage(null), 5000);
+        }
+      };
+      reader.readAsText(file);
     }
   };
 
@@ -159,6 +190,72 @@ export default function Settings() {
             )}
           </div>
         </form>
+      </div>
+
+      {/* Backup & Data Management */}
+      <div className="card max-w-2xl mt-6">
+        <h2 className="text-xl font-semibold mb-4">Backup & Data Management</h2>
+        <p className="text-gray-600 mb-6">
+          Export all your data to a backup file or import previously saved data.
+          Keep regular backups to prevent data loss!
+        </p>
+
+        <div className="space-y-4">
+          <div className="flex gap-3">
+            <button
+              onClick={handleBackupDownload}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Download size={20} />
+              Download Backup
+            </button>
+
+            <button
+              onClick={handleImportClick}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <Upload size={20} />
+              Import Backup
+            </button>
+
+            <button
+              onClick={clearAllData}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center gap-2"
+            >
+              <Trash2 size={20} />
+              Clear All Data
+            </button>
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleFileImport}
+            className="hidden"
+          />
+
+          {importMessage && (
+            <div
+              className={`p-4 rounded-lg ${
+                importMessage.type === 'success'
+                  ? 'bg-green-50 text-green-700 border border-green-200'
+                  : 'bg-red-50 text-red-700 border border-red-200'
+              }`}
+            >
+              {importMessage.text}
+            </div>
+          )}
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="font-semibold text-blue-900 mb-2">How it works:</h3>
+            <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+              <li><strong>Download Backup:</strong> Saves all your clients, invoices, expenses, and settings to a JSON file</li>
+              <li><strong>Import Backup:</strong> Restores data from a previously downloaded backup file</li>
+              <li><strong>Clear All Data:</strong> Permanently deletes all data (make a backup first!)</li>
+            </ul>
+          </div>
+        </div>
       </div>
 
       <div className="card max-w-2xl mt-6">
